@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+    <title>RapFinder !</title>
+  </head>
+  <body>
+    <h1>Welcome to Rap Finder </h1>
+    <h3>Here you can find the best rap song for the last weeks : </h3><br>
+    {% for res in resultat %}
+    {{ res }} <br>
+    {% endfor %}
+    <form action="/delete" method="post">
+    <button name="deleteBtn" type="submit">Delete la table</button>
+    </form>
+  </body>
+</html>
