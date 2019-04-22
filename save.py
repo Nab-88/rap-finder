@@ -7,12 +7,12 @@ def initialisation_db():
     Initialise la base de donnée
     """
     conn = sqlite3.connect('released.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS albums (artist text, nom_album text, type text, release_date text, uri text, id_spotify text)''')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS albums (artist text, nom_album text, type text, release_date text, uri text, id_spotify text)''')
     conn.commit()
-    return (conn, c);
+    return (conn, cursor);
 
-def ajouter_album(conn, c,info_album):
+def ajouter_album(conn, cursor,info_album):
     array = []
     artist = info_album['main_artist']
     nom_album = info_album['nom_album']
@@ -26,22 +26,22 @@ def ajouter_album(conn, c,info_album):
     array.append(release_date)
     array.append(uri)
     array.append(id_spotify)
-    c.execute('''INSERT INTO albums VALUES (?,?,?,?,?,?)''', array )
+    cursor.execute('''INSERT INTO albums VALUES (?,?,?,?,?,?)''', array )
     conn.commit()
     return True
 
-def get_album_all(conn, c):
-    resultat = []
-    for row in c.execute('''SELECT * from albums'''):
-        resultat.append(row)
-    return resultat
+def get_all_album(conn, cursor):
+    result = []
+    for row in cursor.execute('''SELECT * from albums'''):
+        result.append(row)
+    return result
 
-def is_present_db(conn, c, id):
-    if (c.execute('''SELECT * from albums WHERE id_spotify = (?)''', (id,))):
+def is_present_in_db(conn, cursor, id):
+    if (cursor.execute('''SELECT * from albums WHERE id_spotify = (?)''', (id,))):
         return True
     return False
 
-def delete_table_content(conn,c):
-    c.execute('''DELETE FROM albums''')
+def delete_table_content(conn,cursor):
+    cursor.execute('''DELETE FROM albums''')
     conn.commit()
     return True

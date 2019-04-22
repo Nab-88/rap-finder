@@ -3,33 +3,29 @@
 from flask import Flask, render_template, request, session
 import os
 import requests, base64, json, calendar, datetime, sys
-from save import initialisation_db, ajouter_album,get_album_all,is_present_db,delete_table_content
+from save import initialisation_db, ajouter_album,get_all_album,is_present_in_db,delete_table_content
 
 app = Flask(__name__)
-conn, c = initialisation_db()
-# app.secret_key = os.urandom(24)
-# Session(app)
-reload(sys)
-sys.setdefaultencoding('utf8')
+conn, cursor = initialisation_db()
+spotify_url = 'https://api.spotify.com/v1/'
+#reload(sys)
+#sys.setdefaultencoding('utf8')
 
 
 
 @app.route('/')
 def index():
     print("Bienvenue à l'index")
-    for el in c:
-        print(el)
     token = get_token()
-    release = get_new_all(token)
-    parcourir_all(token, release, conn, c)
-    array = get_album_all(conn,c)
-    return render_template('index.html', resultat=array, conn=conn, c=c)
+    release = get_all_new_releases(token)
+    get_artist_from_id(token, '2jFnPm8VeSO19i6B8blXB5')
+    browse_all(token, release, conn, cursor)
+    array = get_all_album(conn,cursor)
+    return render_template('index.html', resultat=array, conn=conn, cursor=cursor)
 
 @app.route('/delete', methods=['POST', 'GET'])
 def button_press():
-    delete_table_content(conn,c)
-    print(get_album_all(conn,c))
-    print("OVEEEER")
+    delete_table_content(conn,cursor)
     return render_template('delete.html');
 
 #acces au token
@@ -44,9 +40,8 @@ def get_token():
     return token
 
 
-#test d'une requete
-def get_album(token, id_test):
-    album = requests.get("https://api.spotify.com/v1/albums/"+id_test,
+def get_album(token, abum_id):
+    album = requests.get(spotify_url + "albums/" + album_id,
     headers = {'Authorization':
     'Bearer '+ token})
     res = json.loads(album.content)
@@ -54,42 +49,39 @@ def get_album(token, id_test):
 
 
 
-def get_new(token, offset):
-    release = requests.get('https://api.spotify.com/v1/browse/new-releases?country=FR&limit=50&offset='+str(offset),
+def get_new_releases(token, offset):
+    releases = requests.get(spotify_url + 'browse/new-releases?country=FR&limit=50&offset='+str(offset),
     headers = {'Authorization':
     'Bearer '+ token})
-    return release
+    return releases
 
-def get_new_all(token):
+def get_all_new_releases(token):
     compteur = 0
     resultat = []
     while(compteur <500):
-    #while(compteur<50):
-        res = get_new(token, compteur)
+        res = get_new_releases(token, compteur)
         compteur += 50
         resultat.append(res)
     return resultat
 
 def get_album_genre(token, album_id):
-    album = requests.get("https://api.spotify.com/v1/albums/"+album_id,
+    album = requests.get(spotify_url + "albums/" +album_id,
     headers = {'Authorization':
     'Bearer '+ token})
     res = json.loads(album.content)
-    print res
     return res["genres"]
 
 def get_artist_genre(token, artist_id):
-    artist = requests.get("https://api.spotify.com/v1/artists/"+artist_id,
+    artist = requests.get(spotify_url + "artists/"+artist_id,
     headers = {'Authorization':
     'Bearer '+ token})
     res = json.loads(artist.content)
-    print res["genres"]
     return res["genres"]
 
-def is_rap_artist(token, artist_id):
-    array_genre = get_artist_genre(token, artist_id)
+def is_rap_genre(token, artist_id):
+    artist_genre = get_artist_genre(token, artist_id)
     array_rap = ["hip hop", "rap", "french rap", "trap", "french hip hop", "irish hip hop", "trap français", "belgian hip hop", "trap music", "pop rap", "gangster rap"]
-    for genre in array_genre:
+    for genre in artist_genre:
         if(genre.encode('utf-8').strip() in array_rap):
             return True
     return False
@@ -97,47 +89,46 @@ def is_rap_artist(token, artist_id):
 
 
 def get_artist_from_id(token, id_artist):
-    artist = requests.get("https://api.spotify.com/v1/artists/"+id_artist,
+    artist = requests.get(spotify_url + "artists/"+id_artist,
     headers = {'Authorization':
     'Bearer '+ token})
     res = json.loads(artist.content)
-    print res
     return res
 
 
-def get_author_of_album(json_album):
+def get_author_of_album(album):
     """
     input : l'item en json définissant un album en particulier
     output : un array contenant l'ensemble des artistes présents sur cet album
     """
     array_artists = []
-    for artist in json_album["artists"]:
+    for artist in album["artists"]:
         array_artists.append(artist["name"])
     return array_artists
 
-def get_date_sortie(json_album):
+def get_release_date(album):
     """
     input : l'item en json définissant un album en particulier
     output : la date de sortie
     """
-    releaseDate = json_album["release_date"].encode('utf-8').strip()
-    return releaseDate
+    return(album["release_date"].encode('utf-8').strip())
 
-def get_info(json_album):
+
+def get_album_info(album):
     """
     input : l'item en json définissant un album en particulier
     output : dictionnaire avec chaque valeur à insérer dans la base de données"
     """
-    info = {'main_artist':"",'nom_album':"",'type':"",'release_date':"",'uri':"",'id_spotify':""}
-    info['main_artist'] = get_author_of_album(json_album)[0]
-    info['nom_album'] = json_album["name"]
-    info['type'] = json_album['album_type']
-    info['release_date'] = json_album['release_date']
-    info['uri'] = json_album['uri']
-    info['id_spotify'] = json_album['id']
+    info = {'main_artist':get_author_of_album(album)[0],
+    'nom_album':album["name"],
+    'type':album['album_type'],
+    'release_date':album['release_date'],
+    'uri':album['uri'],
+    'id_spotify':album['id']
+    }
     return info
 
-def parcourir_all(token, liste_json, conn, c):
+def browse_all(token, liste_json, conn, cursor):
     """
     Cette fonction permet d'écrire dans une string l'ensemble des objets
     présents dans la liste de json passés en entrés de la fonction
@@ -150,8 +141,9 @@ def parcourir_all(token, liste_json, conn, c):
         truc = res["albums"]
         truc2 = truc["items"]
         for album in truc2:
-            info = get_info(album)
-            if(is_rap_artist(token, album["artists"][0]["id"].encode('utf-8').strip())):
+            info = get_album_info(album)
+            if(is_rap_genre(token, album["artists"][0]["id"].encode('utf-8').strip())):
+                #ca je le garde pour l'instant ahah
                 # chaine += "Nom de l'album : " + album["name"].encode('utf-8').strip() + " -- Nom des artistes présents : "
                 # array_artists = get_author_of_album(album)
                 # number_of_artist = len(array_artists)
@@ -167,7 +159,7 @@ def parcourir_all(token, liste_json, conn, c):
                 #         chaine += genre.encode('utf-8').strip() + " "
                 # resultat.append(chaine)
                 # chaine = ""
-                ajouter_album(conn, c, info)
-    if(is_present_db(conn, c, "44ihbsNXtt1hWP8PJtBgSP")):
+                ajouter_album(conn, cursor, info)
+    if(is_present_in_db(conn, cursor, "44ihbsNXtt1hWP8PJtBgSP")):
         print("starfoulah deja present")
     return True
